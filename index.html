@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+      <title>Long Life Web Apps - Matt Andrews</title>
+      <meta name="description" content="A presentation about the challenges of building single page apps">
+      <meta name="author" content="Matt Andrews">
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="css/reveal.min.css">
+      <link rel="stylesheet" href="css/theme/ftlabs.css" id="theme">
+      <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/3.2.1/css/font-awesome.min.css">
+
+      <!-- For syntax highlighting -->
+      <link rel="stylesheet" href="lib/css/zenburn.css">
+
+      <!-- If the query includes 'print-pdf', use the PDF print sheet -->
+      <script>
+      document.write( '<link rel="stylesheet" href="css/print/' + ( window.location.search.match( /print-pdf/gi ) ? 'pdf' : 'paper' ) + '.css" type="text/css" media="print">' );
+      </script>
+      
+      <!--[if lt IE 9]>
+      <script src="lib/js/html5shiv.js"></script>
+      <![endif]-->
+    </head>
+
+    <body>
+      <div class='pointer'></div>
+
+        <div class="reveal">
+          <div class="slides">
+
+            <section class='logo-title dark-background' data-background='css/theme/ftlabs_images/purple-blue-2.jpg'>
+              <h1>Long Life Web Apps</h1>
+              <h3>Our battle against the browser</h3>
+              <p>
+              <small>by Matt Andrews, FT Labs (<a href="http://mattandre.ws">mattandre.ws</a> / <a href="http://twitter.com/andrewsmatt">@andrewsmatt</a>)</small>
+              </p>
+              <aside class='notes'>Good hacks and great performance, smart multivariate responsiveness, and web apps that deserve far more than the lowly title of ‘page’.</aside>
+            </section>
+
+            <section data-background="content/ft.jpg">
+              <img src="content/ft-app-ipad.png"  style="box-shadow: none; background: none" data-fragment-index="0" class="fragment"/>
+              <img src="content/ft-app-iphone.png" class="fragment" data-fragment-index="1"/ style="box-shadow: none; background: none">
+              <img src="content/ft-app-android.png"  style="box-shadow: none; background: none; position: relative; top: -700px; width: 200%;" class="fragment" data-fragment-index="2"/>
+              <img src="content/ft-app-windows.png"  style="box-shadow: none; background: none; position: relative; top: -1200px; width: 200%;" class="fragment" data-fragment-index="3"/>
+              <img src="content/ft-app-firefox.png"  style="box-shadow: none; background: none; position: relative; top: -2000px;" class="fragment" data-fragment-index="4"/>
+            </section>
+
+            <section>
+              <img src="content/app-store-badge.png" style="margin-top: 200px;" />
+              <img src="content/no.png" style="box-shadow: none; position: relative; margin-top: -600px; background: none;" />
+            </section>
+
+            <section>
+              <img src="content/economist-chrome.png" />
+            </section>
+
+            <section>
+              <h2 style="white-space:nowrap">Our web apps</h2>
+              <div style="float: right" class='fragment' data-fragment-index='0'><span style="font-size: 251px; top: 70px; position: relative; }">}</span> 'Long life' web app?
+              </div>
+              <ul>
+                <li><strong>Single</strong> page app</li>
+                <li>'<strong>Many</strong> page app' - website?*</li>
+                <li><strong>Cross platform</strong> - 1 codebase for all</li>
+                <li><strong>Offline</strong> first</li>
+                <li>Time on page <strong>very long</strong> (up to days)**</li>
+                <li>Once installed, code on device <strong>forever</strong>***</li>
+              </ul>
+              <p style="font-size:60%">* Economist only. FT App, soon.</p>
+              <p style="font-size:60%">** On platforms that can run web apps in the background (Windows, Blackberry)</p>
+              <p style="font-size:60%">*** Well, until clear caches.</p>
+              <aside class="notes">I'm a developer on the FT Web app, which is a single page web app that works offline across all major mobile and desktop browsers - creating a full-screen native-app like experience without having to be distributed through any app stores.  I'm going to talk through some of the challenges we faced when building this sort of website.</aside>
+
+            </section>
+
+            <section>
+            <h3 style="white-space: nowrap;">Now need to think <strong>much more</strong> about:</h3>
+              <ul>
+                <li>Memory management and performance</li>
+                <li>Handling link clicks</li>
+                <li>Caching</li>
+                <li>Backwards compatibility</li>
+              </ul>
+              
+              <aside class='notes'>
+As a web developer it's really easy to forget how powerful the browser actually is - and how much work it does for you.  Unlike traditional software development when you make a webpage you normally don't need to worry about memory management or garbage collection or backwards compatability - even if you do break something, most mistakes can be fixed by the user simply clicking refresh.
+              </aside>
+            </section>
+
+            <section class="dark-background big-quote present" data-background="css/theme/ftlabs_images/blue-green-yellow.jpg" style="top: -230px; display: block;">
+              <h1>Memory Management &amp; Performance</h1>
+
+              <aside class='notes'>
+OK so this isn't really an issue that is new to this class of website - but our websites run for hours or for packaged apps - sometimes even days - so performance is critical.
+
+
+The browser has a very good garbage collector - and when you're making normal webpages you probably never need to think about it.  But when you have long lived pages - with user session times reaching dozens of minutes or longer, it can cause a degraded experience - and we suspect it is the cause of some of the crashes our application experiences.
+              </aside>
+            </section>
+
+            <section>
+            <h2>Detached DOM</h2>
+              <img src='content/detacheddom.png' class='fragment' data-fragment-index='0' />
+
+              <aside class='notes'>
+                - Some javascript libraries, such as jQuery, keep a cache of DOM nodes - so if you're using jQuery and want to remove an element from the page you *must* use jQuery's APIs otherwise that cache won't know it needs to update and you'll get a memory leak.
+                - But it's easy to end up with this sort of memory leak in application code too - espeically in apps where you're constantly building and tearing down pages.  The first version of the FT web app was riddled with them.
+                - Luckily Chrome Dev Tools have some quite powerful and relatively easy to use tools for detecting them.
+              </aside>
+            </section>
+
+            <section>
+              <h2>How to find it</h2>
+              <ul>
+                <li>Chrome DevTools &raquo; Profiles &raquo; <strong>Heap Snapshot</strong></li>
+                <li>Filter by <strong>detached</strong> to see the node.</li>
+                <li>Hover the results to get clues about which objects have become detached</li>
+              </ul>
+            </section>
+
+            <section>
+              <img src='content/detacheddevtools.png' class='stretch'/>
+            </section>
+
+            <section>
+              <img src='content/comparison.png' class='stretch' />
+              <ul>
+                <li><strong>ProTip:</strong> Profile; do <strong>one action</strong>; Profile again - and use the <strong>comparison view</strong> (filtered by 'detached') to see if that action caused a leak</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Avoid Memory Leaks</h2>
+              <ul>
+                <li class="fragment" data-framework-index="0">Tidy up after yourself - eg. <strong><code>addEventListener</code></strong> &raquo; <strong><code>removeEventListener</code></strong></li>
+                <li class="fragment" data-framework-index="1">Check 3rd party components tidy up after themselves on <strong><code>destroy</code></strong>
+                <li class="fragment" data-framework-index="2">Be careful with jQuery - it keeps caches to DOM nodes.<br /><strong>Don't mix jQuery DOM methods with native browser methods / libs</strong>.</li>
+                <li class="fragment" data-framework-index="3">Minimise the number of objects added to global scope.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Fix memory leaks to</h2>
+              <ul>
+                <li class="fragment" data-fragment-index='0'>increase <strong>stability</strong></li>
+                <li class="fragment" data-fragment-index='1'>allow the garbage collector to do its job</li>
+                <li class="fragment" data-fragment-index='2'>but for performance, our problems are usually with <strong>rendering</strong></li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Using Timeline</h2>
+              <img src="content/everything-wrong.png" class='stretch' />
+              <h3>Feel like it's just telling me I'm doing everything wrong</h3>
+            </section>
+
+            <section>
+              <h2 class='fragment' data-fragment-index='0'>I want a timeline that looks like this:</h2>
+              <img class='fragment' data-fragment-index='0' src="content/just-timeline.png" class='stretch' />
+            </section>
+
+            <section>
+              <h3>Don’t use your <strong>mouse</strong> when Timeline profiling. Give elements IDs and <strong>trigger the events on them that you want to profile via the console</strong></h3>
+              <a href="http://mattandre.ws/2013/11/filter-noise-output-performance-profiling-timeline-chrome/">(Update: Read more about removing noise from timeline)</a>
+            </section>
+
+            <section>
+              <img src="content/timeline-how.png" />
+            </section>
+
+            <section>
+              <h2>Layout Thrashing</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'>DOM operations are synchronous but 'lazy' by default</li>
+                <li class='fragment' data-fragment-index='1'>Browser will batch writes for you</li>
+                <li class='fragment' data-fragment-index='2'>But you force it to write if you try to read something</li>
+              </ul>
+            </section>
+
+        <section>
+          <h2>Interleaved reads/writes</h2>
+          <pre><code data-trim>
+var h1 = element1.clientHeight;              &lt;== Read (measures the element)
+element1.style.height = (h1 * 2) + 'px';     &lt;== Write (invalidates current layout)
+var h2 = element2.clientHeight;              &lt;== Read (measure again, so must trigger layout)
+element2.style.height = (h1 * 2) + 'px';     &lt;== Write (invalidates current layout)
+var h3 = element3.clientHeight;              &lt;== Read (measure again, so must trigger layout)
+element3.style.height = (h3 * 2) + 'px';     &lt;== Write (invalidates current layout)
+etc.
+          </code></pre>
+        </section>
+
+        <section>
+          <h2>Batching reads/writes manually</h2>
+          <pre><code data-trim>
+var h1 = element1.clientHeight;              &lt;== Read
+var h2 = element2.clientHeight;              &lt;== Read
+var h3 = element3.clientHeight;              &lt;== Read
+element1.style.height = (h1 * 2) + 'px';     &lt;== Write (invalidates current layout)
+element2.style.height = (h1 * 2) + 'px';     &lt;== Write (layout already invalidated)
+element3.style.height = (h3 * 2) + 'px';     &lt;== Write (layout already invalidated)
+h3 = element3.clientHeight                   &lt;== Read (triggers layout)
+etc.
+          </code></pre>
+        </section>
+
+        <section>
+          <h2>Nobody writes code like that</h2>
+        </section>
+        <section>
+          <a href="http://mattandre.ws/2014/05/really-fixing-layout-thrashing/">(Update: Read more about Fixing Layout Thrashing)</a>
+          <img src="content/webapp.png" />
+        </section>
+
+        <section>
+          <h2>Asynchronous DOM?</h2>
+          <p>Use Wilson's <a href='http://github.com/wilsonpage/fastdom'>FastDOM</a> library to get asynchronous DOM today.</p>
+          <pre><code data-trim>
+fastdom.read(function() {
+var h1 = element1.clientHeight;
+fastdom.write(function() {
+  element1.style.height = (h1 * 2) + 'px';
+});
+});
+
+fastdom.read(function() {
+var h2 = element2.clientHeight;
+fastdom.write(function() {
+  element2.style.height = (h1 * 2) + 'px';
+});
+});
+          </code></pre>
+          <p>This works by using <code>requestAnimationFrame</code> to batch writes</p>
+      </section>
+
+            <section>
+              <h2>Recap</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'>Use heap profiler to uncover memory leaks</li>
+                <li class='fragment' data-fragment-index='1'>Batch DOM read and writes to avoid layout thrashing</li>
+              </ul>
+              <p class='fragment' data-fragment-index='2'>&hellip; but don't take my word on any of this.  Measure for your application.</p>
+            </section>
+
+            <section class="dark-background big-quote present" data-background="css/theme/ftlabs_images/blue-green-yellow.jpg" style="top: -230px; display: block;">
+              <h1>Handling Links in&nbsp;a&nbsp;single&nbsp;page&nbsp;app</h1>
+              <blockquote>Should be easy, right?</blockquote>
+            </section>
+
+            <section>
+              <h2>The Challenge</h2>
+              <p>When a user clicks on a link on a full screen iOS web app:</p>
+              <ul>
+                <li>Your web app <strong>closes</strong> <span style="color: green" class="fragment" data-framework-index="0">&laquo; Better this if didn't happen</span></li>
+                <li>The link opens in Safari</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Handling links?</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'>Listen to clicks, and <code>preventDefault()</code></li>
+                <li class='fragment' data-fragment-index='1'>Update the URL bar: <code>history.pushState()</code></li>
+                <li class='fragment' data-fragment-index='2'>Load/display the new page.</li>
+                <li class='fragment' data-fragment-index='3'>Go back with <code>history.back()</code>
+              </ul>
+            </section>
+
+            <section>
+              <h2>'After going back I wasn't where I was before I clicked the link'*</h2>
+              <ul>
+                <li>Listen to clicks, and <code>preventDefault()</code></li>
+                <li class='fragment' data-fragment-index='0'><strong>Save scroll position for current page</strong></li>
+                <li>Update the URL bar: <code>history.pushState()</code></li>
+                <li>Load/display the new page</li>
+                <li class='fragment' data-fragment-index='1'><strong>Restore scroll position if appropriate</strong>
+                <li>Go back with <code>history.back()</code></li>
+              </ul>
+              <p>* Same is true for web forms</p>
+
+              <aside class='notes'>
+- Even simple things like when you click a link, the browser will wipe the slate clean and the next page will be loaded fresh (it will even remember details like how far down they have scrolled on the page they clicked from so that if the user clicks back it will restore their scroll position).  When you create a single page app and start relieving the browser of the responsibility of things as simple as 'handling links' - all those little things the browser does for you become your responsibility.
+              </aside>
+</section>
+
+            <section>
+              <h1>iOS 7 is completely broken</h1>
+              <blockquote><p>&hellip; managing states through hash or other technique<br />the history object will <strong>not keep your navigation history</strong>&hellip; <strong>history.back() will never work</strong></p><cite><a href="http://www.mobilexweb.com/blog/safari-ios7-html5-problems-apis-review"><small>http://mobilexweb.com/blog/safari-ios7-html5-problems-apis-review</small></a></cite></blockquote>
+            </section>
+
+            <section>
+              <h2>And again for iOS 7</h2>
+              <ul>
+                <li>Listen to clicks, and <code>preventDefault()</code></li>
+                <li>Save scroll position for current page</li>
+                <li>Update the URL bar: <code>history.pushState()</code></li>
+                <li class='fragment' data-fragment-index='0'><strong>Or on iOS 7 push the new URL into a custom history array</strong></li>
+                <li>Load/display the new page.</li>
+                <li class='fragment' data-fragment-index='1'><strong>Or on iOS 7 pop the last item from the custom history array &amp; load it</strong></li>
+                <li>Restore scroll position if appropriate</li>
+                <li>Go back with <code>history.back()</code></li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>&hellip;until a journalist embeds a Tweet</h2>
+              <a class='fragment' data-fragment-index='0' href="https://twitter.com/andrewsmatt/status/465164498782146560"><img src="content/bad-libs.png" /></a>
+              <ul>
+                <li class='fragment' data-fragment-index='1'>Twitter library listens to <strong>all clicks</strong> on host page</strong></li>
+                <li class='fragment' data-fragment-index='2'>If URL matches <strong>twitter.com/intent</strong> it opens in a new window<br />(Reminder: on iOS this will close your web app)</li>
+                <li class='fragment' data-fragment-index='3'>(Also an issue on packaged apps - eg. Windows 8 Web Apps, Chrome packaged apps, hybrid apps)</li>
+                <li class='fragment' data-fragment-index='3'><a href="http://mattandre.ws/2014/05/embedding-tweets-single-page-apps/">(Update: Read more about embedding Tweets in single page apps)</a></li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>I'm being unfair to Twitter, lots of libraries have problems.</h2>
+              <ul>
+                <li>Some ad libs wait for <code>DOMContentReady</code> - usually happened a long time ago</li>
+                <li><code>document.write</code> isn't going to work.</li>
+                <li>Analytics libraries lose data when device is offline</li>
+              </ul>
+              <aside class='notes'>
+If you’re building websites in non-standard ways (full screen ‘web apps’; packaged/hybrid apps; single page apps and/or offline first apps) don’t automatically assume that because you’re using ‘web technologies’ you will be able to use every existing library that was built for the web. All libraries – even modern, well written ones like the one Twitter use for embedding Tweets – are built with certain assumptions that may not be true for your product.
+              </aside>
+            </section>
+
+            <section class="dark-background big-quote present" data-background="css/theme/ftlabs_images/red-blue.jpg" style="top: -122px; display: block;">
+              <blockquote>"It won't work in the <strong>web app</strong>"</blockquote>
+              <cite>--Everyone at the FT</cite>
+              <aside class="notes">But we must be doing something wrong if this is the most popular expression in editorial.</aside>
+            </section>
+
+            <section>
+              <h2>3rd party libraries: solutions?</h2>
+              <p class="fragment" data-fragment-index="0">Well no, not really :(</p>
+              <ul>
+                <li class="fragment" data-fragment-index="1">Built our own advertising library</li>
+                <li class="fragment" data-fragment-index="2">Built our own analytics library</li>
+                <li class="fragment" data-fragment-index="3">Built our own <a href="http://github.com/Financial-Times/o-tweet">embedded tweet library</a></li>
+              </ul>
+              <p class="fragment" data-fragment-index="3"><img src='content/o-tweet.png' alt='Build own twitter embed library' class='stretch' style='box-shadow:none' /></p>
+
+              <aside class='notes'>
+There isn't really a good solution right now.  The fundamental problem is that the web lacks encapsulation.
+              </aside>
+            </section>
+
+            <section>
+              <h2>Recap</h2>
+              <ul>
+                <li>Immersive full-screen experience is possible, but <strong>very buggy</strong></li>
+                <li>When going back, restore <strong>scroll position</strong> and <strong>form data</strong></li>
+                <li>Thoroughly test <strong>3rd party libraries</strong></li>
+                <li class='fragment' data-fragment-index='0'>Allocate time around each iOS launch to <strong>fix what Apple break</strong></li>
+              </ul>
+            </section>
+
+            <section class="dark-background big-quote present" data-background="css/theme/ftlabs_images/blue-green-yellow.jpg" style="top: -230px; display: block;">
+              <h1>Caching for offline</h1>
+            </section>
+
+            <section>
+              <h2>Naive approach</h2>
+              <ul>
+                <li><code>if</code> <strong>device is online</strong>, load from the web</li>
+                <li><code>else</code> load from cache</li>
+                <li>Browser even has handy method for checking connection: <code><strong>navigator.onLine</strong></code></li>
+              </ul>
+            </section>
+
+            <section>
+              <h2><code><strong>navigator.onLine</strong></code> doesn't work</h2>
+              <ul>
+                <li>Flaky connections</li>
+                <li>Captive portals</li>
+                <li>Good connection but your server is down or blocked</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Fun fact:</h2>
+              <h3>On Desktop Firefox <strong><code>navigator.onLine</code></strong><br />is only false when <strong>File &raquo; Work Offline</strong> is ticked</h3>
+              <em>Who even uses that anyway?</em>
+            </section>
+
+            <section>
+              <h2>Live with uncertainty</h2>
+              <ul>
+                <li><strong>Assume the device is offline</strong>, load from cache</li>
+                <li>Then try the network for new data <strong>in the background</strong></li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>For a page to load offline,<br />you need to use the <strong>HTML5 Application Cache</strong></h3>
+              <p>Manifest looks like this:</p>
+              <p>
+<pre><code data-trim>
+CACHE MANIFEST
+# 2014-05 v1
+/lib/fonts/BentonSansBold.ttf
+/lib/img/startupscreen/splash-logo.png
+
+NETWORK
+*
+          </code></pre>
+              <p>And to use it you need to add an attribute to <code>&lt;html&gt;</code></p>
+              <pre><code data-trim>
+&lt;DOCTYPE html&gt;
+&lt;html manifest="mywebapp.manifest"&gt;
+              </code></pre>
+            </section>
+
+            <section>
+              <h2>Sadly, it's not quite that easy</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'><strong>Leaks storage</strong> (workarounds exist)</li>
+                <li class='fragment' data-fragment-index='1'><strong>Inflexible</strong> and <strong>unintuitive</strong> API</li>
+                <li class='fragment' data-fragment-index='2'>Makes browser susceptible to scary <strong>man in the middle attacks</strong>&hellip; whether you use it or not</li>
+                <li class='fragment' data-fragment-index='3'>Will soon be replaced by <strong>Service Worker</strong></li>
+              </ul>
+              <aside class='notes'>Technically already available in Canary, behind a flag - but you can only install, uninstall and send messages to it right now - all the cool offline stuff not ready yet</aside>
+            </section>
+
+            <section>
+              <img src='content/dont-use-appcache.png' class='stretch' />
+            </section>
+
+            <section>
+            <a href="http://alistapart.com/article/application-cache-is-a-douchebag"><img src='content/douchebag.png' class='stretch' /></a>
+              <aside class='notes'>
+                Even Chrome dev relations people will tell you the Application Cache is a douchebag.  
+              </aside>
+            </section>
+
+            <section>
+              <h2>But&hellip;</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'>It <em><strong>does</strong></em> work</li>
+                <li class='fragment' data-fragment-index='1'><strong><em>across 80%+* of browsers</em></strong> (iOS, Android, Chrome, Opera, IE10+)</li>
+                <li class='fragment' data-fragment-index='2'>Only <strong>Chrome</strong> and <strong>Firefox</strong> have committed to building Service Worker implementations</li>
+              </ul>
+              <p style='font-size:80%; margin-bottom: 15px;' class='fragment' data-fragment-index='1'>* http://caniuse.com/offline-apps</p>
+            </section>
+
+            <section>
+              <h2>AppCache OK</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'>Yes it's ugly <strong>for developers</strong></li>
+                <li class='fragment' data-fragment-index='1'>But it enables amazing experiences <strong>for users</strong></li>
+                <li class='fragment' data-fragment-index='2'>There <strong>are</strong> use cases where it works well</li>
+                <li class='fragment' data-fragment-index='3'>Unfortunately, building a newspaper app isn't one of them</li>
+              </ul>
+            </section>
+
+            <section class="dark-background big-quote present" data-background="css/theme/ftlabs_images/blue-green-yellow.jpg" style="top: -230px; display: block;">
+              <h1>Backwards compatability</h1>
+            </section>
+
+            <section>
+              <h2 style="font-size:150%">Unlike native apps,<br />offline websites only download updates</h2>
+              <h1>when they're open</h1>
+              <h2 style="font-size:150%">and only applies those updates on refresh</h2>
+              <aside class='notes'>And some users get stuck on old versions - we're still detecting API calls<br />from Javascript that hasn't been served for a year</aside>
+            </section>
+
+            <section>
+              <h3><strong>App start</strong> events split by version of client side code</h3>
+              <img src="content/release.png" />
+            </section>
+
+            <section>
+              <h2>Guidance</h2>
+              <ul>
+                <li class='fragment' data-fragment-index='0'><strong>Expect</strong> some users to get stuck<span class='fragment' data-fragment-index='1'>, <em>add tools to help users recover their apps</em></li>
+                  <li class='fragment' data-fragment-index='2'>Test <strong>different versions</strong> of client side code against <strong>different backend versions</strong></li>
+                <li class='fragment' data-fragment-index='3'>Add <strong>monitoring</strong></li>
+                <li class='fragment' data-fragment-index='4'>Add buttons to <strong>recovery tools</strong> that appear after a <strong>CSS animation</strong> if JS fails</li>
+                <li class='fragment' data-fragment-index='5'><strong>Version</strong> everything <em> - API endpoints, data formats</em></li>
+                <li class='fragment' data-fragment-index='6'>Client side database migrations are painful.  Store data in its <strong>simplest form</strong> (JSON better than HTML)</li>
+              </ul>
+            </section>  
+
+            <section class='dark-background' data-background="css/theme/ftlabs_images/blue-green-yellow.jpg">
+              <h2>Summary</h2>
+              <ul style="background: rgba(0,0,0,0.3);padding: 50px; ">
+                <li><strong>Browsers do much more than render</strong>.  If you're website doesn't restore state well (scroll, form data) users will be upset</li>
+                <li><strong>Offline is possible <u>today</u></strong>, with enough persistence</li>
+                <li><strong>Test</strong>, <strong>measure</strong> and <strong>monitor</strong> everything, including 3rd parties</li>
+                <li class='fragment' data-fragment-index='0'>Never listen to people who tell you not to use any particular technology</li>
+              </ul>
+            </section>
+
+            <section>
+              <a href="https://twitter.com/andrewsmatt/status/367599219512594434">
+                <h2>So don't listen to me</h2>
+                <img src="content/dontusejquery.png" class='stretch'/>
+              </a>
+            </section>
+
+        <section class='logo-title dark-background' data-background='css/theme/ftlabs_images/purple-blue-2.jpg'>
+          <h1>That's it!</h1>
+          <h1>@andrewsmatt</h1>
+
+          <h3 style="margin: 10px 0 0 0">Offline Web Workshop</h3>
+          <p><a href="http://smashingconf.com/freiburg-2014/workshops/matthew-andrews">I'm running <strong>a workshop at SmashingConf</strong> on<br />the Offline Web in September in Freiberg</a></p> 
+          <ul style="margin-top:30px">
+            <li>Email: <a href='mailto:matthew.andrews@ft.com'>matthew.andrews@ft.com</a></li>
+            <li>Our open source: <a href="http://github.com/ftlabs">github.com/ftlabs</a>
+            <li>Jobs: <a href="http://labs.ft.com/jobs">labs.ft.com/jobs</a>
+          </ul>
+        </section>
+
+
+
+
+
+      </div>
+
+    </div>
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.min.js"></script>
+    <script src="lib/js/chart.min.js"></script>
+
+    <script>
+      Reveal.initialize({
+        width: 1280,
+          height: 800,
+        controls: false,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'ftlabs',
+        transition: 'concave',
+        backgroundTransition: 'slide',
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+        ]
+      });
+      Reveal.addEventListener('slidechanged', function(e) {
+        if (e.currentSlide.classList.contains('big-quote')) {
+          var h1 = e.currentSlide.querySelector('h1');
+          if (h1 && !e.currentSlide.querySelector('span.bghead')) {
+            var bgh1 = document.createElement('span');
+            bgh1.classList.add('bghead');
+            bgh1.innerHTML = h1.innerHTML;
+            h1.parentNode.appendChild(bgh1);
+          }
+        }
+      });
+
+      // Charts
+      Reveal.addEventListener('chart1', function(e) {
+        var crt = document.getElementById("chart1");
+        crt.style.width = (crt.width = crt.parentNode.offsetWidth)+'px';
+        crt.style.height = (crt.height = crt.parentNode.offsetHeight)+'px';
+        new Chart(crt.getContext("2d")).Line({
+          labels : ["2011", "", "", "", "2012", "", "", "", "2013", "", ""],
+          datasets : [
+            {
+              strokeColor : "#00A9E0",
+              fillColor: 'none',
+              data : [381659, 356196, 344583, 333772, 319381, 297227, 287894, 286401, 273048, 258488, 241886]
+              },
+            {
+              strokeColor : "#FFA02F",
+              fillColor: 'none',
+              data : [223743, 229485, 247807, 267497, 285475, 301471, 312538, 315918, 328306, 343408, 386871]
+            }
+          ]
+        }, {
+          scaleOverlay: true,
+          scaleOverride: true,
+          scaleSteps: 10,
+          scaleStepWidth : 50000,
+          scaleStartValue: 0,
+          bezierCurve: false,
+          scaleLineColor : "rgba(0,0,0,.3)",
+          scaleFontSize : 25,
+        });
+      });
+
+      // Charts
+      Reveal.addEventListener('rwd-demo', function(e) {
+        var ifr = document.getElementById("guardianiframe");
+        function move() {
+          setTimeout(function() {
+            var w = ifr.offsetWidth;
+            ifr.style.width = ((Math.random() * 800) + 400) + 'px';
+            if (document.documentElement.className.indexOf('rwd-demo') !== -1) move();
+          }, 3000);
+        }
+        move();
+      });
+
+    </script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-34192510-4', 'matthew-andrews.github.io');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>
